@@ -1,0 +1,205 @@
+#!/usr/bin/env python
+
+#this code was created on 16th march
+#its a merger of lcd.py and p3change1.py
+
+#imported files
+**********************
+import smtplib						
+from email.MIMEMultipart import MIMEMultipart		
+from email.MIMEBase import MIMEBase
+from email.MIMEText import MIMEText
+from email.Utils import COMMASPACE, formatdate
+from email import Encoders
+import serial						 
+import time
+from time import sleep
+from datetime import datetime
+import os
+import RPi.GPIO as GPIO
+import lcddriver
+from time import *
+************************
+
+#setting up GPIO pins for IO purposes
+*************************
+GPIO.setmode(GPIO.BCM)
+#GPIO.setup(23,GPIO.OUT)
+#GPIO.setwarnings(False)
+GPIO.setup(17,GPIO.OUT)
+GPIO.setwarnings(False)
+GPIO.setup(22,GPIO.OUT)
+GPIO.setwarnings(False)
+GPIO.setup(7,GPIO.IN)
+GPIO.setwarnings(False)
+
+GPIO.output(17,GPIO.LOW)
+GPIO.output(22,GPIO.LOW)
+#GPIO.output(23,GPIO.LOW)
+*************************
+
+#setting up variables
+**********************************
+lcd = lcddriver.lcd()
+# lcd.lcd_clear();
+
+#i = 0
+#count = 0
+adv = 123
+ani = 456
+ruc = 789
+advb = "123\n"
+anib = "456\n"
+rucb = "789\n"
+
+USERNAME = "electroniclock16@gmail.com"
+PASSWORD = "lockelectronic"
+**************************************
+
+#This function is used to send e-mail
+****************************************
+def sendMail(to, subject, text, files=[]):
+    assert type(to)==list
+    assert type(files)==list
+
+    msg = MIMEMultipart()
+    msg['From'] = USERNAME
+    msg['To'] = COMMASPACE.join(to)
+    msg['Date'] = formatdate(localtime=True)
+    msg['Subject'] = subject
+
+    msg.attach( MIMEText(text) )
+
+    for file in files:
+        part = MIMEBase('application', "octet-stream")
+        part.set_payload( open(file,"rb").read() )
+        Encoders.encode_base64(part)
+        part.add_header('Content-Disposition', 'attachment; filename="%s"'
+                       % os.path.basename(file))
+        msg.attach(part)
+
+	server = smtplib.SMTP('smtp.gmail.com:587')
+	server.ehlo_or_helo_if_needed()
+	server.starttls()
+	server.ehlo_or_helo_if_needed()
+	server.login(USERNAME,PASSWORD)
+	server.sendmail(USERNAME, to, msg.as_string())
+	server.quit()
+****************************************
+
+#This function is used to close the lock
+#This function is used to open the lock
+****************************************
+def lock_open():
+	time.sleep(2)
+	GPIO.output(17,GPIO.HIGH)
+	GPIO.output(22,GPIO.LOW)
+	time.sleep(2)
+	key = 1
+
+	while(key != 0):
+		key = int(raw_input("press 0 to lock"))
+		lcd.lcd_display_string("press 0 to lock", 1)
+
+	time.sleep(2)
+	GPIO.output(17,GPIO.LOW)
+	GPIO.output(22,GPIO.HIGH)
+	time.sleep(2)
+***************************
+
+#This function is used to check whether 
+#the entered password is correct or not
+***************************************************
+def check_password(password):
+	if (password == adv or password == advb):
+		print "Advait has opened the lock"
+
+		lcd.lcd_display_string("Advait has ", 1)
+		lcd.lcd_display_string("Opened the lock", 2)
+
+		os.system("fswebcam -r 1280x720  /home/pi/Desktop/img/user.jpg" )
+		my_file = open("/home/pi/Desktop/data_log.txt", "a")
+		my_file.write("User: Advait	time and date:" + str(datetime.now())+ "\n")
+		my_file.close()
+		sendMail( ["anirudhbhat24@gmail.com"],
+        "Doorbell notification",
+        "Advait has opened the lock, picture attached",
+        ["/home/pi/Desktop/img/user.jpg"] )
+		lock_open()
+
+	elif (password == ani or password == anib):
+		print "Anirudh has opened the lock"
+
+		lcd.lcd_display_string("Anirudh has ", 1)
+		lcd.lcd_display_string("Opened the lock", 2)
+
+		os.system("fswebcam -r 1280x720  /home/pi/Desktop/img/user.jpg")
+		my_file = open("/home/pi/Desktop/data_log.txt", "a")
+		my_file.write("User: Ani	time and date:" + str(datetime.now())+ "\n")
+		my_file.close()
+                sendMail( ["anirudhbhat24@gmail.com"],
+               "Doorbell notification",
+        "Anirudh has opened the lock, picture attached",
+        ["/home/pi/Desktop/img/user.jpg"] )
+		lock_open()
+
+	elif (password == ruc or password == rucb):
+		print "Ruchir has opened the lock"
+
+		lcd.lcd_display_string("Ruchir has ", 1)
+		lcd.lcd_display_string("Opened the lock", 2)
+
+		os.system("fswebcam -r 1280x720  /home/pi/Desktop/img/user.jpg")
+		my_file = open("/home/pi/Desktop/data_log.txt", "a")
+		my_file.write("user: Ruchir	time and date:" + str(datetime.now())+ "\n")
+		my_file.close()
+		sendMail( ["anirudhbhat24@gmail.com"],
+        "Doorbell notification",
+        "Ruchir  has opened the lock, picture attached",
+        ["/home/pi/Desktop/img/user.jpg"] )
+		lock_open()
+
+#	else:
+#		count = count + 1
+	
+#	i = i + 1
+*****************************************
+
+#continous loop used to get user ip 
+***************************************
+while True:
+	#count = 0
+	password = 0
+	
+	while(GPIO.input(7) == GPIO.LOW):
+		print "detecting"
+		lcd.lcd_display_string("detecting", 1)
+		time.sleep(2)
+	print "detected"
+	lcd.lcd_display_string("detected", 1)
+
+	print "wait... checking for bluetooth input"
+	lcd.lcd_display_string("checking for bt", 1)
+
+	port = serial.Serial("/dev/ttyAMA0", baudrate=9600, timeout =4.0)
+	port.open()
+	port.write("enter password\n")
+	port.flush()
+	
+	try:
+		rcv = port.readline()
+		check_password(rcv)
+
+	except IOError:
+		pass
+	
+	password = int(raw_input("enter password\n"))
+	lcd.lcd_display_string("enter password:", 1)
+	time.sleep(10.0)
+
+	if (password != 0): 
+		check_password(password)
+#	if (count == 3):
+#		GPIO.output(23,GPIO.HIGH)
+#		time.sleep(5)
+******************************************
